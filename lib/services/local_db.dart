@@ -1,56 +1,173 @@
-import 'dart:async';
-// ignore_for_file: unnecessary_import
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:http/http.dart' as http;
+
 import '../models/client.dart';
 
 class LocalDB {
-  static const _boxName = 'clients_box_v1';
+  static const _binId = '690ee3a7ae596e708f4bd148';
+  static const _masterKey =
+      r'$2a$10$SgT4qoOKXP6CD4u1jPEpduwi.2NbrCqV2u71AaL7mGaW.77CmNU7u';
+  static const _baseUrl = 'https://api.jsonbin.io/v3/b';
+
+  static final http.Client _httpClient = http.Client();
+  static List<ClientModel> _cache = [];
 
   static Future<void> init() async {
-    await Hive.initFlutter();
-    await Hive.openBox(_boxName);
+    await _syncFromRemote();
   }
 
-  static Box get _box => Hive.box(_boxName);
+  static Future<void> refresh() => _syncFromRemote();
 
-  // Auto-increment id based on latest key
-  static int _nextId() {
-    if (_box.isEmpty) return 1;
-    final keys = _box.keys.whereType<int>().toList()..sort();
-    return (keys.isEmpty ? 0 : keys.last) + 1;
-  }
-
-  static Future<ClientModel> addClient(String name, String mobile4g, String fibre) async {
+  static Future<ClientModel> addClient(
+    String name,
+    String mobile4g,
+    String fibre,
+  ) async {
     final id = _nextId();
-    final model = ClientModel(id: id, name: name, mobile4g: mobile4g, fibre: fibre);
-    await _box.put(id, model.toMap());
-    return model;
+    final model =
+        ClientModel(id: id, name: name, mobile4g: mobile4g, fibre: fibre);
+    final previous = List<ClientModel>.from(_cache);
+    _cache.add(model);
+    _sortCache();
+    try {
+      await _persist();
+      return model;
+    } catch (e) {
+      _cache = previous;
+      rethrow;
+    }
   }
 
   static Future<void> updateClient(ClientModel client) async {
-    await _box.put(client.id, client.toMap());
+    final index = _cache.indexWhere((c) => c.id == client.id);
+    if (index == -1) {
+      throw ArgumentError('Client with id ${client.id} not found.');
+    }
+    final previous = List<ClientModel>.from(_cache);
+    _cache[index] = client;
+    _sortCache();
+    try {
+      await _persist();
+    } catch (e) {
+      _cache = previous;
+      rethrow;
+    }
   }
 
   static Future<void> deleteClient(int id) async {
-    await _box.delete(id);
+    final previous = List<ClientModel>.from(_cache);
+    _cache.removeWhere((c) => c.id == id);
+    try {
+      await _persist();
+    } catch (e) {
+      _cache = previous;
+      rethrow;
+    }
   }
 
-  static List<ClientModel> getAll() {
-    return _box.toMap().entries
-        .where((e) => e.key is int)
-        .map((e) => ClientModel.fromMap(Map<String, dynamic>.from(e.value)))
-        .toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
-  }
+  static List<ClientModel> getAll() => List.unmodifiable(_cache);
 
   static List<ClientModel> search(String q) {
     final query = q.trim().toLowerCase();
     if (query.isEmpty) return getAll();
-    return getAll().where((c) {
-      return c.name.toLowerCase().contains(query) ||
-          c.mobile4g.contains(query) ||
-          c.fibre.contains(query);
-    }).toList();
+    return _cache
+        .where((c) =>
+            c.name.toLowerCase().contains(query) ||
+            c.mobile4g.toLowerCase().contains(query) ||
+            c.fibre.toLowerCase().contains(query))
+        .toList(growable: false);
+  }
+
+  static Future<void> _syncFromRemote() async {
+    final uri = Uri.parse('$_baseUrl/$_binId/latest');
+    final response = await _httpClient.get(uri, headers: _headers);
+    if (response.statusCode == 200) {
+      final payload = jsonDecode(response.body);
+      final record = payload is Map<String, dynamic> ? payload['record'] : null;
+      final List<dynamic> rawList;
+      if (record is Map<String, dynamic>) {
+        rawList = (record['clients'] as List?) ?? const [];
+      } else if (record is List) {
+        rawList = record;
+      } else {
+        rawList = const [];
+      }
+      _cache = rawList
+          .whereType<Map>()
+          .map((entry) => ClientModel.fromMap(
+                Map<String, dynamic>.from(entry),
+              ))
+          .toList();
+      _sortCache();
+      return;
+    }
+
+    if (response.statusCode == 404) {
+      _cache = [];
+      return;
+    }
+
+    throw JsonBinException(
+      'Failed to load data from JSONBin.',
+      statusCode: response.statusCode,
+      details: response.body,
+    );
+  }
+
+  static Future<void> _persist() async {
+    final uri = Uri.parse('$_baseUrl/$_binId');
+    final body =
+        jsonEncode({'clients': _cache.map((c) => c.toMap()).toList()});
+    final response = await _httpClient.put(
+      uri,
+      headers: {
+        ..._headers,
+        'Content-Type': 'application/json',
+      },
+      body: body,
+    );
+
+    if (response.statusCode >= 400) {
+      throw JsonBinException(
+        'Failed to save data to JSONBin.',
+        statusCode: response.statusCode,
+        details: response.body,
+      );
+    }
+  }
+
+  static Map<String, String> get _headers => {
+        'X-Master-Key': _masterKey,
+      };
+
+  static int _nextId() {
+    if (_cache.isEmpty) return 1;
+    return _cache.map((c) => c.id).reduce(max) + 1;
+  }
+
+  static void _sortCache() {
+    _cache.sort((a, b) => a.name.compareTo(b.name));
+  }
+}
+
+class JsonBinException implements Exception {
+  final String message;
+  final int? statusCode;
+  final String? details;
+
+  const JsonBinException(this.message, {this.statusCode, this.details});
+
+  @override
+  String toString() {
+    final buffer = StringBuffer(message);
+    if (statusCode != null) {
+      buffer.write(' (status $statusCode)');
+    }
+    if (details != null && details!.isNotEmpty) {
+      buffer.write(': $details');
+    }
+    return buffer.toString();
   }
 }

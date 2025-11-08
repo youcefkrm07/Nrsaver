@@ -33,6 +33,13 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  void _showError(String message, Object error) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$message: $error')),
+    );
+  }
+
   Future<void> _addOrUpdate({ClientModel? edit}) async {
     final s = Strings.of(context);
     if (edit != null) {
@@ -90,37 +97,50 @@ class _HomePageState extends State<HomePage> {
                       },
                       keyboard: TextInputType.number,
                     ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        if (_formKey.currentState?.validate() != true) return;
-                        // Capture Navigator before awaiting to avoid using context across async gaps
-                        final nav = Navigator.of(ctx);
-                        if (edit == null) {
-                          await LocalDB.addClient(
-                              _nameCtrl.text.trim(),
-                              _g4Ctrl.text.trim(),
-                              _fibreCtrl.text.trim());
-                        } else {
-                          await LocalDB.updateClient(edit.copyWith(
-                            name: _nameCtrl.text.trim(),
-                            mobile4g: _g4Ctrl.text.trim(),
-                            fibre: _fibreCtrl.text.trim(),
-                          ));
-                        }
-                        _nameCtrl.clear();
-                        _g4Ctrl.clear();
-                        _fibreCtrl.clear();
-                        if (nav.canPop()) {
-                          nav.pop();
-                        }
-                        _refresh();
-                      },
-                      child: Text(edit == null ? s.addClient : s.edit),
-                    ),
-                  )
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            if (_formKey.currentState?.validate() != true) return;
+                            // Capture Navigator before awaiting to avoid using context across async gaps
+                            final nav = Navigator.of(ctx);
+                            try {
+                              if (edit == null) {
+                                await LocalDB.addClient(
+                                  _nameCtrl.text.trim(),
+                                  _g4Ctrl.text.trim(),
+                                  _fibreCtrl.text.trim(),
+                                );
+                              } else {
+                                await LocalDB.updateClient(
+                                  edit.copyWith(
+                                    name: _nameCtrl.text.trim(),
+                                    mobile4g: _g4Ctrl.text.trim(),
+                                    fibre: _fibreCtrl.text.trim(),
+                                  ),
+                                );
+                              }
+                              _nameCtrl.clear();
+                              _g4Ctrl.clear();
+                              _fibreCtrl.clear();
+                              if (nav.canPop()) {
+                                nav.pop();
+                              }
+                              if (!mounted) return;
+                              _refresh();
+                            } catch (e) {
+                              _showError(
+                                edit == null
+                                    ? (s.isAr ? 'فشل حفظ العميل' : 'Failed to add client')
+                                    : (s.isAr ? 'فشل تحديث العميل' : 'Failed to update client'),
+                                e,
+                              );
+                            }
+                          },
+                          child: Text(edit == null ? s.addClient : s.edit),
+                        ),
+                      )
                 ],
               ),
             ),
@@ -184,40 +204,51 @@ class _HomePageState extends State<HomePage> {
                 Text(s.subtitle,
                     style: Theme.of(context).textTheme.bodyMedium),
                 const SizedBox(height: 12),
-                TextField(
-                  onChanged: (v) {
-                    _search = v;
-                    _refresh();
-                  },
-                  decoration: InputDecoration(
-                    hintText: s.searchHint,
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    filled: true,
+                  TextField(
+                    onChanged: (v) {
+                      _search = v;
+                      _refresh();
+                    },
+                    decoration: InputDecoration(
+                      hintText: s.searchHint,
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Expanded(
-                  child: _clients.isEmpty
-                      ? Center(
-                          child: Text(isRtl ? 'لا يوجد بيانات' : 'No data'),
-                        )
-                      : ListView.builder(
-                          itemCount: _clients.length,
-                          itemBuilder: (context, i) {
-                            final c = _clients[i];
-                            return _ClientTile(
-                              client: c,
-                              onEdit: () => _addOrUpdate(edit: c),
-                              onDelete: () async {
-                                await LocalDB.deleteClient(c.id);
-                                _refresh();
-                              },
-                            );
-                          },
-                        ),
-                ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: _clients.isEmpty
+                        ? Center(
+                            child: Text(isRtl ? 'لا يوجد بيانات' : 'No data'),
+                          )
+                        : ListView.builder(
+                            itemCount: _clients.length,
+                            itemBuilder: (context, i) {
+                              final c = _clients[i];
+                              return _ClientTile(
+                                client: c,
+                                onEdit: () => _addOrUpdate(edit: c),
+                                onDelete: () async {
+                                  try {
+                                    await LocalDB.deleteClient(c.id);
+                                    if (!mounted) return;
+                                    _refresh();
+                                  } catch (e) {
+                                    _showError(
+                                      s.isAr
+                                          ? 'فشل حذف العميل'
+                                          : 'Failed to delete client',
+                                      e,
+                                    );
+                                  }
+                                },
+                              );
+                            },
+                          ),
+                  ),
               ],
             ),
           ),
