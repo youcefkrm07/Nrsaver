@@ -36,4 +36,26 @@ class Strings {
   String get ofClient => isAr ? 'عميل' : 'of client';
   String get edit => isAr ? 'تعديل' : 'Edit';
   String get delete => isAr ? 'حذف' : 'Delete';
+  String get copy => isAr ? 'نسخ' : 'Copy';
+  String get copied =>
+      isAr ? 'تم النسخ إلى الحافظة' : 'Copied to clipboard';
+  String get exportDb =>
+      isAr ? 'تصدير قاعدة البيانات' : 'Export database';
+  String get importDb =>
+      isAr ? 'استيراد قاعدة البيانات' : 'Import database';
+  String get exportSuccess => isAr
+      ? 'تم تصدير قاعدة البيانات بنجاح'
+      : 'Database exported successfully';
+  String get exportFailure =>
+      isAr ? 'فشل تصدير قاعدة البيانات' : 'Failed to export database';
+  String get importSuccess => isAr
+      ? 'تم استيراد قاعدة البيانات بنجاح'
+      : 'Database imported successfully';
+  String get importFailure =>
+      isAr ? 'فشل استيراد قاعدة البيانات' : 'Failed to import database';
+  String get importUnsupported => isAr
+      ? 'لا يمكن قراءة ملف النسخ الاحتياطي المحدد'
+      : 'Unable to read the selected backup file';
+  String get selectExportDirectory =>
+      isAr ? 'اختر مجلد التصدير' : 'Select export folder';
 }

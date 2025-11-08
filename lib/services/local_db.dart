@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 // ignore_for_file: unnecessary_import
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path/path.dart' as p;
 import '../models/client.dart';
 
 class LocalDB {
@@ -52,5 +55,40 @@ class LocalDB {
           c.mobile4g.contains(query) ||
           c.fibre.contains(query);
     }).toList();
+  }
+
+  static Future<String> exportToDirectory(String directoryPath,
+      {String? fileName}) async {
+    final box = _box;
+    await box.flush();
+    final sourcePath = box.path;
+    if (sourcePath == null) {
+      throw StateError('Database file path is not available');
+    }
+    final exportName = fileName ?? '${_boxName}_backup.hive';
+    final targetPath = p.join(directoryPath, exportName);
+    final exported = await File(sourcePath).copy(targetPath);
+    return exported.path;
+  }
+
+  static Future<void> importFromFile(String sourcePath) async {
+    final file = File(sourcePath);
+    if (!await file.exists()) {
+      throw FileSystemException('Backup file not found', sourcePath);
+    }
+    final bytes = await file.readAsBytes();
+    await importFromBytes(bytes);
+  }
+
+  static Future<void> importFromBytes(Uint8List bytes) async {
+    final box = _box;
+    final destinationPath = box.path;
+    if (destinationPath == null) {
+      throw StateError('Database file path is not available');
+    }
+    await box.close();
+    final file = File(destinationPath);
+    await file.writeAsBytes(bytes, flush: true);
+    await Hive.openBox(_boxName);
   }
 }
