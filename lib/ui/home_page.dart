@@ -257,17 +257,31 @@ class _ClientTile extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            Row(children: [
-              const Icon(Icons.call, size: 18, color: Colors.teal),
-              const SizedBox(width: 8),
-              Text('4G: ${client.mobile4g}')
-            ]),
+            Row(
+              children: [
+                const Icon(Icons.call, size: 18, color: Colors.teal),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SelectableText(
+                    '4G: ${client.mobile4g}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 6),
-            Row(children: [
-              const Icon(Icons.wifi, size: 18, color: Colors.blue),
-              const SizedBox(width: 8),
-              Text('FIBRE: ${client.fibre}')
-            ]),
+            Row(
+              children: [
+                const Icon(Icons.wifi, size: 18, color: Colors.blue),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SelectableText(
+                    'FIBRE: ${client.fibre}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
