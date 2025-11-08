@@ -54,40 +54,44 @@ class _HomePageState extends State<HomePage> {
             right: 16,
             top: 16,
           ),
-          child: Directionality(
-            textDirection: s.isAr ? TextDirection.rtl : TextDirection.ltr,
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _field(
-                    label: s.name,
-                    controller: _nameCtrl,
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? s.enterName
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
-                  _field(
-                    label: s.n4g,
-                    controller: _g4Ctrl,
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? s.enter4g
-                        : null,
-                    keyboard: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 12),
-                  _field(
-                    label: s.fibre,
-                    controller: _fibreCtrl,
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? s.enterFibre
-                        : null,
-                    keyboard: TextInputType.number,
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
+            child: Directionality(
+              textDirection: s.isAr ? TextDirection.rtl : TextDirection.ltr,
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _field(
+                      label: s.name,
+                      controller: _nameCtrl,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? s.enterName
+                          : null,
+                    ),
+                    const SizedBox(height: 12),
+                    _field(
+                      label: s.n4g,
+                      controller: _g4Ctrl,
+                      validator: (v) {
+                        final has4g = v != null && v.trim().isNotEmpty;
+                        final hasFibre = _fibreCtrl.text.trim().isNotEmpty;
+                        return has4g || hasFibre ? null : s.enter4gOrFibre;
+                      },
+                      keyboard: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 12),
+                    _field(
+                      label: s.fibre,
+                      controller: _fibreCtrl,
+                      validator: (v) {
+                        final hasFibre = v != null && v.trim().isNotEmpty;
+                        final has4g = _g4Ctrl.text.trim().isNotEmpty;
+                        return has4g || hasFibre ? null : s.enter4gOrFibre;
+                      },
+                      keyboard: TextInputType.number,
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () async {

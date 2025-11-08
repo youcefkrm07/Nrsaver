@@ -26,6 +26,8 @@ class Strings {
   String get enter4g => isAr ? 'أدخل رقم الموبايل 4G' : 'Enter 4G mobile number';
   String get fibre => isAr ? 'رقم الألياف الضوئية' : 'FIBRE Number';
   String get enterFibre => isAr ? 'أدخل رقم الألياف الضوئية' : 'Enter FIBRE number';
+  String get enter4gOrFibre =>
+      isAr ? 'أدخل رقم 4G أو رقم الألياف الضوئية' : 'Enter 4G or FIBRE number';
   String get addClient => isAr ? 'إضافة عميل' : 'Add Client';
   String get searchHint => isAr
       ? 'البحث بالإسم أو رقم 4G أو رقم الألياف...'
