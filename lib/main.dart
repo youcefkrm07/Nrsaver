@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
@@ -6,7 +7,12 @@ import 'ui/home_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await LocalDB.init();
+  try {
+    await LocalDB.init();
+  } catch (e, st) {
+    debugPrint('Failed to load clients from JSONBin: $e');
+    debugPrintStack(stackTrace: st);
+  }
   runApp(const MyApp());
 }
 
