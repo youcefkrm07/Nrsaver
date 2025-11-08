@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../l10n/app_localizations.dart';
-import '../services/local_db.dart';
 import '../models/client.dart';
+import '../services/local_db.dart';
+import '../services/remote_api.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -18,6 +20,8 @@ class _HomePageState extends State<HomePage> {
   String _search = '';
 
   List<ClientModel> _clients = [];
+  bool _hasAnyClient = false;
+  bool _savingOnline = false;
 
   @override
   void initState() {
@@ -26,10 +30,23 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _refresh() {
+    final allClients = LocalDB.getAll();
+    final trimmedQuery = _search.trim();
+
+    final filtered = trimmedQuery.isEmpty
+        ? allClients
+        : allClients
+            .where((client) {
+              final query = trimmedQuery.toLowerCase();
+              return client.name.toLowerCase().contains(query) ||
+                  client.mobile4g.toLowerCase().contains(query) ||
+                  client.fibre.toLowerCase().contains(query);
+            })
+            .toList();
+
     setState(() {
-      _clients = _search.isEmpty
-          ? LocalDB.getAll()
-          : LocalDB.search(_search);
+      _hasAnyClient = allClients.isNotEmpty;
+      _clients = filtered;
     });
   }
 
@@ -130,6 +147,65 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _g4Ctrl.dispose();
+    _fibreCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveOnline() async {
+    if (_savingOnline) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final s = Strings.of(context);
+    final allClients = LocalDB.getAll();
+
+    if (allClients.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(s.saveOnlineNoClients),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+
+    setState(() => _savingOnline = true);
+
+    final result = await RemoteApi.saveClients(allClients);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _savingOnline = false);
+
+    if (!result.success) {
+      debugPrint(
+          'Remote save failed (status ${result.statusCode ?? 'unknown'}): ${result.message}');
+      if (result.error != null) {
+        debugPrint('Remote save error detail: ${result.error}');
+      }
+    }
+
+    final statusSuffix =
+        result.statusCode != null ? ' (HTTP ${result.statusCode})' : '';
+    final snackBarText = result.success
+        ? '${s.saveOnlineSuccess}$statusSuffix'
+        : '${s.saveOnlineError}$statusSuffix\n${result.message}';
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(snackBarText),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Widget _field({
     required String label,
     required TextEditingController controller,
@@ -198,10 +274,32 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton.icon(
+                    onPressed:
+                        (!_hasAnyClient || _savingOnline) ? null : _saveOnline,
+                    icon: _savingOnline
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(Icons.cloud_upload_outlined),
+                    label: Text(
+                      _savingOnline ? s.savingOnline : s.saveOnline,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Expanded(
                   child: _clients.isEmpty
                       ? Center(
-                          child: Text(isRtl ? 'لا يوجد بيانات' : 'No data'),
+                          child: Text(s.noData),
                         )
                       : ListView.builder(
                           itemCount: _clients.length,
