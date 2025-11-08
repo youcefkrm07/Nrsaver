@@ -1,6 +1,5 @@
 // ✅ CRITICAL: Required imports for signing configuration
 import java.util.Properties
-import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
@@ -12,8 +11,12 @@ plugins {
 // ✅ Load signing configuration
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+val requiredKeystoreKeys = listOf("keyAlias", "keyPassword", "storeFile", "storePassword")
+val hasReleaseSigningConfig = if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+    requiredKeystoreKeys.all { !keystoreProperties.getProperty(it).isNullOrBlank() }
+} else {
+    false
 }
 
 android {
@@ -32,12 +35,12 @@ android {
 
     // ✅ Signing configurations
     signingConfigs {
-        create("release") {
-            if (keystorePropertiesFile.exists()) {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
+        if (hasReleaseSigningConfig) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
             }
         }
     }
@@ -55,8 +58,13 @@ android {
 
     buildTypes {
         release {
-            // ✅ Use release signing configuration
-            signingConfig = signingConfigs.getByName("release")
+            // ✅ Use release signing configuration when available, otherwise fall back to debug
+            signingConfig = if (hasReleaseSigningConfig) {
+                signingConfigs.getByName("release")
+            } else {
+                println("Warning: Using debug signing config because release keystore was not found or is incomplete.")
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
