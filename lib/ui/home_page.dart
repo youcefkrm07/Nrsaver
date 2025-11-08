@@ -1,4 +1,6 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../l10n/app_localizations.dart';
 import '../services/local_db.dart';
 import '../models/client.dart';
@@ -31,6 +33,63 @@ class _HomePageState extends State<HomePage> {
           ? LocalDB.getAll()
           : LocalDB.search(_search);
     });
+  }
+
+  Future<void> _exportDb() async {
+    final s = Strings.of(context);
+    try {
+      final directory = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: s.selectExportDirectory,
+      );
+      if (directory == null) return;
+      final fileName =
+          'clients_backup_${DateTime.now().millisecondsSinceEpoch}.hive';
+      final savedPath =
+          await LocalDB.exportToDirectory(directory, fileName: fileName);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${s.exportSuccess}\n$savedPath')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${s.exportFailure}\n$e')),
+      );
+    }
+  }
+
+  Future<void> _importDb() async {
+    final s = Strings.of(context);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['hive'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.single;
+      if (file.bytes != null) {
+        await LocalDB.importFromBytes(file.bytes!);
+      } else if (file.path != null) {
+        await LocalDB.importFromFile(file.path!);
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(s.importUnsupported)),
+        );
+        return;
+      }
+      if (!mounted) return;
+      _refresh();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(s.importSuccess)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${s.importFailure}\n$e')),
+      );
+    }
   }
 
   Future<void> _addOrUpdate({ClientModel? edit}) async {
@@ -159,6 +218,16 @@ class _HomePageState extends State<HomePage> {
         appBar: AppBar(
           title: Text(s.appTitle),
           actions: [
+            IconButton(
+              tooltip: s.exportDb,
+              icon: const Icon(Icons.file_upload),
+              onPressed: _exportDb,
+            ),
+            IconButton(
+              tooltip: s.importDb,
+              icon: const Icon(Icons.file_download),
+              onPressed: _importDb,
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: PopupMenuButton<Locale>(
@@ -236,8 +305,8 @@ class _ClientTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = Strings.of(context);
-    // ignore: unused_local_variable
-    final _ = s; // keep reference to suppress unused warning
+    final mobile4g = client.mobile4g.trim();
+    final fibre = client.fibre.trim();
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -267,6 +336,21 @@ class _ClientTile extends StatelessWidget {
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
+                IconButton(
+                  tooltip: s.copy,
+                  icon: const Icon(Icons.copy, size: 18),
+                  onPressed: mobile4g.isEmpty
+                      ? null
+                      : () async {
+                        final messenger = ScaffoldMessenger.of(context);
+                        await Clipboard.setData(
+                          ClipboardData(text: mobile4g),
+                        );
+                        messenger.showSnackBar(
+                          SnackBar(content: Text(s.copied)),
+                        );
+                      },
+                ),
               ],
             ),
             const SizedBox(height: 6),
@@ -279,6 +363,21 @@ class _ClientTile extends StatelessWidget {
                     'FIBRE: ${client.fibre}',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
+                ),
+                IconButton(
+                  tooltip: s.copy,
+                  icon: const Icon(Icons.copy, size: 18),
+                  onPressed: fibre.isEmpty
+                      ? null
+                      : () async {
+                        final messenger = ScaffoldMessenger.of(context);
+                        await Clipboard.setData(
+                          ClipboardData(text: fibre),
+                        );
+                        messenger.showSnackBar(
+                          SnackBar(content: Text(s.copied)),
+                        );
+                      },
                 ),
               ],
             ),
