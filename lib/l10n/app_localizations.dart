@@ -36,4 +36,14 @@ class Strings {
   String get ofClient => isAr ? 'عميل' : 'of client';
   String get edit => isAr ? 'تعديل' : 'Edit';
   String get delete => isAr ? 'حذف' : 'Delete';
+  String get saveOnline => isAr ? 'حفظ عبر الإنترنت' : 'Save Online';
+  String get savingOnline => isAr ? 'جارٍ الحفظ...' : 'Saving...';
+  String get saveOnlineSuccess =>
+      isAr ? 'تم حفظ البيانات عبر الإنترنت.' : 'Saved online successfully.';
+  String get saveOnlineError =>
+      isAr ? 'تعذر الحفظ عبر الإنترنت.' : 'Online save failed.';
+  String get saveOnlineNoClients => isAr
+      ? 'أضف عميلًا واحدًا على الأقل قبل الحفظ عبر الإنترنت.'
+      : 'Add at least one client before saving online.';
+  String get noData => isAr ? 'لا يوجد بيانات' : 'No data';
 }
